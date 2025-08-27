@@ -42,3 +42,7 @@ Install with [uv](https://github.com/astral-sh/uv).
   ```
   
   The .exe will be generated in dist/keep_awake_tray.exe
+
+## Preview
+  <img width="150" height="96" alt="image" src="https://github.com/user-attachments/assets/54e8d67b-0f16-42ce-92c1-f5883492a729" />
+
