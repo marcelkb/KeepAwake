@@ -5,36 +5,73 @@ import threading
 from loguru import logger
 import pystray
 from PIL import Image, ImageDraw
+from pathlib import Path
+import json
 
 # --- Logging setup ---
 logger.remove()
 logger.add("keep_awake.log", rotation="1 day", retention="1 day", level="INFO")
 
+
+# --- Load configuration ---
+CONFIG_FILE = Path("config.json")
+if CONFIG_FILE.exists():
+    with open(CONFIG_FILE, "r") as f:
+        config = json.load(f)
+else:
+    config = {"start_hour": 8, "end_hour": 18,   "sleep_after_min": 30, "check_interval_sec": 300}
+    with open(CONFIG_FILE, "w") as f:
+        json.dump(config, f, indent=4)
+
+# --- Config ---
+START_HOUR = config.get("start_hour", 8)
+END_HOUR = config.get("end_hour", 18)
+SLEEP_AFTER_MIN = config.get("sleep_after_min", 30)
+CHECK_INTERVAL = config.get("check_interval_sec", 300)
+
+
 # --- Sleep control ---
 running = True
 working = True  # whether we keep the PC awake
+last_state = None  # Track last applied state
+
 
 def disable_sleep():
     subprocess.run(["powercfg", "-change", "-standby-timeout-ac", "0"], shell=True)
     logger.info("Sleep disabled")
 
 def enable_sleep():
-    subprocess.run(["powercfg", "-change", "-standby-timeout-ac", "30"], shell=True)
+    subprocess.run(["powercfg", "-change", "-standby-timeout-ac", f"{SLEEP_AFTER_MIN}"], shell=True)
     logger.info("Sleep enabled")
 
 
-def keep_awake(start_hour=8, end_hour=18):
+# --- Background worker ---
+def keep_awake():
+    global last_state
     logger.info("KeepAwake service started")
+
     while running:
-        logger.info("checking...")
         now = datetime.datetime.now()
         weekday = now.weekday()  # 0=Monday, 6=Sunday
-        if working and weekday < 5 and start_hour <= now.hour < end_hour:
-            disable_sleep()
+
+        # Determine desired state
+        if working and weekday < 5 and START_HOUR <= now.hour < END_HOUR:
+            desired_state = "awake"
         else:
-            enable_sleep()
-        logger.info("sleep 5min")
-        time.sleep(300)  # check every 5 minutes
+            desired_state = "normal"
+
+        # Apply change only if state has changed
+        if desired_state != last_state:
+            if desired_state == "awake":
+                disable_sleep()
+            else:
+                enable_sleep()
+            last_state = desired_state
+        else:
+            logger.info(f"No state change, still '{last_state}'")
+
+        logger.info(f"Sleep {CHECK_INTERVAL}s")
+        time.sleep(CHECK_INTERVAL)  # check every 5 minutes
 
 # --- Icon creation ---
 def make_icon(color):
