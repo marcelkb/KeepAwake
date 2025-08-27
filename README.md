@@ -11,7 +11,7 @@ It runs silently in the system tray with a green/red status icon and simple menu
 
 ## ✨ Features
 - 🟢 **Green tray icon** when active, 🔴 **red icon** when stopped  
-- ⏰ Keeps your PC awake **Monday–Friday, 08:00–18:00** 
+- ⏰ Keeps your PC awake **Monday–Friday, 08:00–18:00** (configurable)
 - 📜 Logging with [loguru](https://github.com/Delgan/loguru) (`keep_awake.log`, rotated daily)  
 - 🖱️ Tray menu options: **Start / Stop / Exit**  
 - 🚀 Build into a standalone `.exe` with [PyInstaller](https://pyinstaller.org/)  
@@ -24,6 +24,25 @@ It runs silently in the system tray with a green/red status icon and simple menu
   - [loguru](https://github.com/Delgan/loguru)  
   - [pystray](https://github.com/moses-palmer/pystray)  
   - [Pillow](https://python-pillow.org/)  
+
+## ⚙️ Configuration (`config.json`)
+
+The behavior of **KeepAwake** can be customized using a simple `config.json` file located in the same folder as the script or executable.
+- start_hour: hour of the working week where the script should begin to avoid standby
+- end_hour: hour of the working week where the script should end the avoid of standby
+- sleep_after_min: configuration for the powerplan sleep after x minutes
+- check_interval_sec: seconds to wait to check again if the powerplan must be changed based on time
+
+### Example `config.json`
+
+```json
+{
+  "start_hour": 8,
+  "end_hour": 18,
+  "sleep_after_min": 30,
+  "check_interval_sec": 300
+}
+```
 
 Install with [uv](https://github.com/astral-sh/uv).  
 
