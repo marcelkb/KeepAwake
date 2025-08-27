@@ -1,0 +1,11 @@
+[project]
+name = "keep_awake"
+version = "0.1.0"
+description = "Add your description here"
+requires-python = ">=3.13"
+dependencies = [
+    "loguru",
+    "pillow>=11.3.0",
+    "pyinstaller>=6.15.0",
+    "pystray>=0.19.5",
+]
