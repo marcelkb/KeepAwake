@@ -78,6 +78,8 @@ def keep_awake(icon):
         # optical if its in working time and enabled
         if desired_state == "awake" and weekday < 5 and START_HOUR <= now.hour < END_HOUR and icon.icon != ICON_WORKTIME:
             icon.icon = ICON_WORKTIME
+        elif desired_state == "normal" or not (weekday < 5 and START_HOUR <= now.hour < END_HOUR):
+            icon.icon = ICON_ACTIVE
 
         logger.info(f"Sleep {CHECK_INTERVAL}s")
         time.sleep(CHECK_INTERVAL)  # check every 5 minutes
