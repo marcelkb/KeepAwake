@@ -32,6 +32,7 @@ The behavior of **KeepAwake** can be customized using a simple `config.json` fil
 - end_hour: hour of the working week where the script should end the avoid of standby
 - sleep_after_min: configuration for the powerplan sleep after x minutes
 - check_interval_sec: seconds to wait to check again if the powerplan must be changed based on time
+- disable_if_workstation_locked: disables the function if workstation is locked, default is false
 
 ### Example `config.json`
 
@@ -41,6 +42,7 @@ The behavior of **KeepAwake** can be customized using a simple `config.json` fil
   "end_hour": 18,
   "sleep_after_min": 30,
   "check_interval_sec": 300
+  "disable_if_workstation_locked": false
 }
 ```
 
