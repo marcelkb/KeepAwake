@@ -5,7 +5,7 @@
 ![Status](https://img.shields.io/badge/Status-Active-success.svg)
 
 A lightweight **Windows tray app** that prevents your PC from going into standby during working hours if connected to ac.  
-It runs silently in the system tray with a green/red status icon and simple menu controls.
+It runs silently in the system tray with a green/orange/red status icon and simple menu controls.
 
 ---
 
