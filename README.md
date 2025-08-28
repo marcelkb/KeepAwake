@@ -10,7 +10,7 @@ It runs silently in the system tray with a green/red status icon and simple menu
 ---
 
 ## ✨ Features
-- 🟢 **Green tray icon** when active, 🔴 **red icon** when stopped  
+- 🟢 **Green tray icon** when supressing standby in working hours, 🟠 **orange icon** when active but not in working hours, 🔴 **red icon** when stopped  
 - ⏰ Keeps your PC awake **Monday–Friday, 08:00–18:00** (configurable)
 - 📜 Logging with [loguru](https://github.com/Delgan/loguru) (`keep_awake.log`, rotated daily)  
 - 🖱️ Tray menu options: **Start / Stop / Exit**  
