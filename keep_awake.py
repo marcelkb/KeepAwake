@@ -49,7 +49,7 @@ def enable_sleep():
 
 
 # --- Background worker ---
-def keep_awake():
+def keep_awake(icon):
     global last_state
     logger.info("KeepAwake service started")
     while running:
@@ -75,6 +75,10 @@ def keep_awake():
         else:
             logger.info(f"No state change, still '{last_state}'")
 
+        # optical if its in working time and enabled
+        if desired_state == "awake" and weekday < 5 and START_HOUR <= now.hour < END_HOUR and icon.icon != ICON_WORKTIME:
+            icon.icon = ICON_WORKTIME
+
         logger.info(f"Sleep {CHECK_INTERVAL}s")
         time.sleep(CHECK_INTERVAL)  # check every 5 minutes
 
@@ -86,8 +90,9 @@ def make_icon(color):
     draw.ellipse((8, 8, 56, 56), fill=color)
     return img
 
-ICON_ACTIVE = make_icon((0, 200, 0))   # green
+ICON_WORKTIME = make_icon((0, 200, 0))   # green
 ICON_INACTIVE = make_icon((200, 0, 0)) # red
+ICON_ACTIVE = make_icon((255, 165, 0)) # Orange
 
 def is_workstation_locked():
     """
@@ -113,7 +118,13 @@ def is_workstation_locked():
 def on_start(icon, item):
     global working
     working = True
-    icon.icon = ICON_ACTIVE
+    now = datetime.datetime.now()
+    weekday = now.weekday()  # 0=Monday, 6=Sunday
+    if weekday < 5 and START_HOUR <= now.hour < END_HOUR and icon.icon != ICON_WORKTIME:
+        icon.icon = ICON_WORKTIME
+    else:
+        icon.icon = ICON_ACTIVE
+
     logger.info("KeepAwake activated")
     disable_sleep()
 
@@ -143,14 +154,15 @@ def run_tray():
             pystray.MenuItem("Exit", on_exit)
         )
     )
+
+    # Worker mit Icon starten
+    t = threading.Thread(target=keep_awake, args=(icon,), daemon=True)
+    t.start()
+
     icon.run()
 
 
 
 if __name__ == "__main__":
-    # Run background task
-    t = threading.Thread(target=keep_awake, daemon=True)
-    t.start()
-
     # Run tray icon
     run_tray()
