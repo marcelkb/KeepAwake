@@ -1,3 +1,4 @@
+import ctypes
 import time
 import datetime
 import subprocess
@@ -7,6 +8,8 @@ import pystray
 from PIL import Image, ImageDraw
 from pathlib import Path
 import json
+import win32api
+import win32con
 
 # --- Logging setup ---
 logger.remove()
@@ -19,7 +22,7 @@ if CONFIG_FILE.exists():
     with open(CONFIG_FILE, "r") as f:
         config = json.load(f)
 else:
-    config = {"start_hour": 8, "end_hour": 18,   "sleep_after_min": 30, "check_interval_sec": 300}
+    config = {"start_hour": 8, "end_hour": 18,   "sleep_after_min": 30, "check_interval_sec": 300, "disable_if_workstation_locked": False}
     with open(CONFIG_FILE, "w") as f:
         json.dump(config, f, indent=4)
 
@@ -28,7 +31,7 @@ START_HOUR = config.get("start_hour", 8)
 END_HOUR = config.get("end_hour", 18)
 SLEEP_AFTER_MIN = config.get("sleep_after_min", 30)
 CHECK_INTERVAL = config.get("check_interval_sec", 300)
-
+DISABLE_IF_WORKSTATION_LOCKED = config.get("disable_if_workstation_locked", False)
 
 # --- Sleep control ---
 running = True
@@ -49,16 +52,18 @@ def enable_sleep():
 def keep_awake():
     global last_state
     logger.info("KeepAwake service started")
-
     while running:
         now = datetime.datetime.now()
         weekday = now.weekday()  # 0=Monday, 6=Sunday
 
-        # Determine desired state
-        if working and weekday < 5 and START_HOUR <= now.hour < END_HOUR:
-            desired_state = "awake"
+        if DISABLE_IF_WORKSTATION_LOCKED and is_workstation_locked():
+            desired_state = "normal"  # monitor locked → do nothing
+            logger.info("Workstation locked → allowing normal standby")
         else:
-            desired_state = "normal"
+            if working and weekday < 5 and START_HOUR <= now.hour < END_HOUR:
+                desired_state = "awake"
+            else:
+                desired_state = "normal"
 
         # Apply change only if state has changed
         if desired_state != last_state:
@@ -84,18 +89,40 @@ def make_icon(color):
 ICON_ACTIVE = make_icon((0, 200, 0))   # green
 ICON_INACTIVE = make_icon((200, 0, 0)) # red
 
+def is_workstation_locked():
+    """
+    Returns True if the workstation is locked, False otherwise.
+    """
+    user32 = ctypes.windll.User32
+    hDesktop = user32.OpenInputDesktop(0, False, win32con.DESKTOP_SWITCHDESKTOP)
+    if hDesktop == 0:
+        # Desktop is locked or unavailable
+        return True
+    else:
+        user32.CloseDesktop(hDesktop)
+        return False
+
+# def turn_off_screen():
+#     """
+#     Function to turn off the screen.
+#     """
+#     return win32api.PostMessage(win32con.HWND_BROADCAST,
+#                             win32con.WM_SYSCOMMAND, win32con.SC_MONITORPOWER, 2)
+
 # --- Tray menu actions ---
 def on_start(icon, item):
     global working
     working = True
     icon.icon = ICON_ACTIVE
     logger.info("KeepAwake activated")
+    disable_sleep()
 
 def on_stop(icon, item):
     global working
     working = False
     icon.icon = ICON_INACTIVE
     logger.info("KeepAwake deactivated")
+    enable_sleep()
 
 def on_exit(icon, item):
     global running

@@ -2,5 +2,6 @@
   "start_hour": 8,
   "end_hour": 18,
   "sleep_after_min": 30,
-  "check_interval_sec": 300
+  "check_interval_sec": 300,
+  "disable_if_workstation_locked": false
 }

@@ -8,4 +8,5 @@ dependencies = [
     "pillow>=11.3.0",
     "pyinstaller>=6.15.0",
     "pystray>=0.19.5",
+    "pywin32>=311",
 ]
