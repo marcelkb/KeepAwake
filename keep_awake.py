@@ -40,12 +40,35 @@ last_state = None  # Track last applied state
 
 
 def disable_sleep():
-    subprocess.run(["powercfg", "-change", "-standby-timeout-ac", "0"], shell=True)
-    logger.info("Sleep disabled")
+    # Run the command
+    result = subprocess.run(
+        ["powercfg", "-change", "-standby-timeout-ac", "0"],
+        capture_output=True,
+        text=True,
+        shell=True
+    )
+
+    if result.returncode != 0:
+        logger.error("❌ Failed to run powercfg:", result.stderr.strip())
+        return False
+
+    logger.info("✅ Sleep successfully disabled on AC power.")
+    return True
+
 
 def enable_sleep():
-    subprocess.run(["powercfg", "-change", "-standby-timeout-ac", f"{SLEEP_AFTER_MIN}"], shell=True)
-    logger.info("Sleep enabled")
+    """Enable standby on AC power with given timeout (default 30 min) and verify."""
+    result = subprocess.run(
+        ["powercfg", "-change", "-standby-timeout-ac", str(SLEEP_AFTER_MIN)],
+        capture_output=True,
+        text=True,
+        shell=True
+    )
+    if result.returncode != 0:
+        logger.error("❌ Failed to run powercfg:", result.stderr.strip())
+        return False
+    logger.info(f"✅ Sleep successfully enabled with timeout {SLEEP_AFTER_MIN} min.")
+    return True
 
 
 # --- Background worker ---
@@ -68,10 +91,13 @@ def keep_awake(icon):
         # Apply change only if state has changed
         if desired_state != last_state:
             if desired_state == "awake":
-                disable_sleep()
+                success = disable_sleep()
             else:
-                enable_sleep()
-            last_state = desired_state
+                success = enable_sleep()
+            if success:
+                last_state = desired_state
+            else:
+                logger.info("no state change, sleep change call was unsuccessful")
         else:
             logger.info(f"No state change, still '{last_state}'")
 
