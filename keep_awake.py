@@ -38,7 +38,6 @@ running = True
 working = True  # whether we keep the PC awake
 last_state = None  # Track last applied state
 
-
 def disable_sleep():
     # Run the command
     result = subprocess.run(
@@ -118,6 +117,7 @@ def make_icon(color):
     draw.ellipse((8, 8, 56, 56), fill=color)
     return img
 
+ICON_FORCE = make_icon((0, 0, 200))   # blue
 ICON_WORKTIME = make_icon((0, 200, 0))   # green
 ICON_INACTIVE = make_icon((200, 0, 0)) # red
 ICON_ACTIVE = make_icon((255, 165, 0)) # Orange
@@ -156,6 +156,14 @@ def on_start(icon, item):
     logger.info("KeepAwake activated")
     disable_sleep()
 
+def on_force(icon, item):
+    global working
+    if working is True:
+        working = False
+        disable_sleep()
+        icon.icon = ICON_FORCE
+        logger.info("KeepAwake force activated")
+
 def on_stop(icon, item):
     global working
     working = False
@@ -179,6 +187,7 @@ def run_tray():
         menu=pystray.Menu(
             pystray.MenuItem("Start", on_start),
             pystray.MenuItem("Stop", on_stop),
+            pystray.MenuItem("Force", on_force),
             pystray.MenuItem("Exit", on_exit)
         )
     )
