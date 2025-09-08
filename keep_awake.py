@@ -1,8 +1,8 @@
 import ctypes
-import time
 import datetime
 import subprocess
 import threading
+
 from loguru import logger
 import pystray
 from PIL import Image, ImageDraw
@@ -34,9 +34,10 @@ CHECK_INTERVAL = config.get("check_interval_sec", 300)
 DISABLE_IF_WORKSTATION_LOCKED = config.get("disable_if_workstation_locked", False)
 
 # --- Sleep control ---
-running = True
 working = True  # whether we keep the PC awake
 last_state = None  # Track last applied state
+stop_event = threading.Event()
+worker_thread = None  # global
 
 def disable_sleep():
     # Run the command
@@ -74,7 +75,7 @@ def enable_sleep():
 def keep_awake(icon):
     global last_state
     logger.info("KeepAwake service started")
-    while running:
+    while not stop_event.is_set():
         now = datetime.datetime.now()
         weekday = now.weekday()  # 0=Monday, 6=Sunday
 
@@ -95,19 +96,26 @@ def keep_awake(icon):
                 success = enable_sleep()
             if success:
                 last_state = desired_state
-            else:
-                logger.info("no state change, sleep change call was unsuccessful")
-        else:
-            logger.info(f"No state change, still '{last_state}'")
+                update_status(icon)
 
-        # optical if its in working time and enabled
-        if desired_state == "awake" and weekday < 5 and START_HOUR <= now.hour < END_HOUR and icon.icon != ICON_WORKTIME:
-            icon.icon = ICON_WORKTIME
-        elif desired_state == "normal" or not (weekday < 5 and START_HOUR <= now.hour < END_HOUR):
-            icon.icon = ICON_ACTIVE
+                # optical if its in working time and enabled
+                if desired_state == "awake" and weekday < 5 and START_HOUR <= now.hour < END_HOUR and icon.icon != ICON_WORKTIME:
+                    icon.icon = ICON_WORKTIME
+                elif desired_state == "normal" or not (weekday < 5 and START_HOUR <= now.hour < END_HOUR):
+                    icon.icon = ICON_ACTIVE
+            else:
+                logger.error("no state change, sleep change call was unsuccessful")
+        else:
+            logger.info(f"No state change, still '{last_state}' with working: {working} and stop event not set.")
+
+        # If icon object exists but tray is gone → restart it
+        if icon and not icon.visible:
+            logger.info("Explorer restarted? → restoring tray icon")
+            restart_icon()
 
         logger.info(f"Sleep {CHECK_INTERVAL}s")
-        time.sleep(CHECK_INTERVAL)  # check every 5 minutes
+        # Wait, but allow early exit
+        stop_event.wait(CHECK_INTERVAL)
 
 # --- Icon creation ---
 def make_icon(color):
@@ -145,41 +153,65 @@ def is_workstation_locked():
 # --- Tray menu actions ---
 def on_start(icon, item):
     global working
+    global last_state
     working = True
     now = datetime.datetime.now()
     weekday = now.weekday()  # 0=Monday, 6=Sunday
     if weekday < 5 and START_HOUR <= now.hour < END_HOUR and icon.icon != ICON_WORKTIME:
         icon.icon = ICON_WORKTIME
+        disable_sleep()
+        last_state = "awake"
     else:
         icon.icon = ICON_ACTIVE
-
+        enable_sleep()
+        last_state = "normal"
+    update_status(icon)
     logger.info("KeepAwake activated")
-    disable_sleep()
 
 def on_force(icon, item):
     global working
+    global last_state
     if working is True:
         working = False
         disable_sleep()
+        last_state = "awake"
         icon.icon = ICON_FORCE
+        update_status(icon)
         logger.info("KeepAwake force activated")
 
 def on_stop(icon, item):
     global working
     working = False
     icon.icon = ICON_INACTIVE
-    logger.info("KeepAwake deactivated")
     enable_sleep()
+    update_status(icon)
+    logger.info("KeepAwake deactivated")
 
 def on_exit(icon, item):
-    global running
-    running = False
     icon.stop()
+    stop_event.set()  # signal thread to stop immediately
+    update_status(icon)
     logger.info("Exiting KeepAwake")
 
 
+def restart_icon():
+    global icon
+    logger.info("restart tray icon")
+    if icon:
+        try:
+            icon.stop()
+        except Exception:
+            pass
+    run_tray(start_worker=False)
+
+
+def update_status(icon):
+    icon.title = f"KeepAwake - {'Running' if working else 'Stopped'}{'' if last_state is None else ' - ' + last_state.capitalize()}"
+
 # --- Tray runner ---
-def run_tray():
+def run_tray(start_worker=True):
+    global icon, worker_thread
+    logger.info("run_tray()")
     icon = pystray.Icon(
         "keep_awake",
         ICON_ACTIVE if working else ICON_INACTIVE,
@@ -191,15 +223,31 @@ def run_tray():
             pystray.MenuItem("Exit", on_exit)
         )
     )
+    update_status(icon)  # set initial status
 
-    # Worker mit Icon starten
-    t = threading.Thread(target=keep_awake, args=(icon,), daemon=True)
-    t.start()
-
+    # Start worker only once
+    if start_worker and worker_thread is None:
+        logger.info("starting worker thread")
+        worker_thread = threading.Thread(target=keep_awake, args=(icon,), daemon=True)
+        worker_thread.start()
     icon.run()
 
-
+# def explorer_monitor():
+#     while True:
+#         # Look for the "Shell_TrayWnd" window (taskbar)
+#         hwnd = win32gui.FindWindow("Shell_TrayWnd", None)
+#         if hwnd == 0:  # Explorer not running
+#             time.sleep(2)
+#             continue
+#
+#         # If icon object exists but tray is gone → restart it
+#         if icon and not icon.visible:
+#             logger.info("Explorer restarted → restoring tray icon")
+#             restart_icon()
+#
+#         time.sleep(5)
 
 if __name__ == "__main__":
-    # Run tray icon
+    #logger.info("starting explorer monitor")
     run_tray()
+    #threading.Thread(target=explorer_monitor, daemon=True).start()
