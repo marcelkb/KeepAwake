@@ -76,37 +76,40 @@ def keep_awake(icon):
     global last_state
     logger.info("KeepAwake service started")
     while not stop_event.is_set():
-        now = datetime.datetime.now()
-        weekday = now.weekday()  # 0=Monday, 6=Sunday
+        if working:
+            now = datetime.datetime.now()
+            weekday = now.weekday()  # 0=Monday, 6=Sunday
 
-        if DISABLE_IF_WORKSTATION_LOCKED and is_workstation_locked():
-            desired_state = "normal"  # monitor locked → do nothing
-            logger.info("Workstation locked → allowing normal standby")
+            if DISABLE_IF_WORKSTATION_LOCKED and is_workstation_locked():
+                desired_state = "normal"  # monitor locked → do nothing
+                logger.info("Workstation locked → allowing normal standby")
+            else:
+                if working and weekday < 5 and START_HOUR <= now.hour < END_HOUR:
+                    desired_state = "awake"
+                else:
+                    desired_state = "normal"
+
+            # Apply change only if state has changed
+            if desired_state != last_state:
+                if desired_state == "awake":
+                    success = disable_sleep()
+                else:
+                    success = enable_sleep()
+                if success:
+                    last_state = desired_state
+                    update_status(icon)
+
+                    # optical if its in working time and enabled
+                    if desired_state == "awake" and weekday < 5 and START_HOUR <= now.hour < END_HOUR and icon.icon != ICON_WORKTIME:
+                        icon.icon = ICON_WORKTIME
+                    elif desired_state == "normal" or not (weekday < 5 and START_HOUR <= now.hour < END_HOUR):
+                        icon.icon = ICON_ACTIVE
+                else:
+                    logger.error("no state change, sleep change call was unsuccessful")
+            else:
+                logger.info(f"No state change, still '{last_state}' with working: {working} and stop event not set.")
         else:
-            if working and weekday < 5 and START_HOUR <= now.hour < END_HOUR:
-                desired_state = "awake"
-            else:
-                desired_state = "normal"
-
-        # Apply change only if state has changed
-        if desired_state != last_state:
-            if desired_state == "awake":
-                success = disable_sleep()
-            else:
-                success = enable_sleep()
-            if success:
-                last_state = desired_state
-                update_status(icon)
-
-                # optical if its in working time and enabled
-                if desired_state == "awake" and weekday < 5 and START_HOUR <= now.hour < END_HOUR and icon.icon != ICON_WORKTIME:
-                    icon.icon = ICON_WORKTIME
-                elif desired_state == "normal" or not (weekday < 5 and START_HOUR <= now.hour < END_HOUR):
-                    icon.icon = ICON_ACTIVE
-            else:
-                logger.error("no state change, sleep change call was unsuccessful")
-        else:
-            logger.info(f"No state change, still '{last_state}' with working: {working} and stop event not set.")
+            logger.info(f"working: {working} and stop event not set.")
 
         # If icon object exists but tray is gone → restart it
         if icon and not icon.visible:
@@ -154,6 +157,7 @@ def is_workstation_locked():
 def on_start(icon, item):
     global working
     global last_state
+    logger.info("on_start")
     working = True
     now = datetime.datetime.now()
     weekday = now.weekday()  # 0=Monday, 6=Sunday
@@ -171,6 +175,7 @@ def on_start(icon, item):
 def on_force(icon, item):
     global working
     global last_state
+    logger.info("on_force")
     if working is True:
         working = False
         disable_sleep()
@@ -181,6 +186,7 @@ def on_force(icon, item):
 
 def on_stop(icon, item):
     global working
+    logger.info("on_stop")
     working = False
     icon.icon = ICON_INACTIVE
     enable_sleep()
@@ -188,6 +194,7 @@ def on_stop(icon, item):
     logger.info("KeepAwake deactivated")
 
 def on_exit(icon, item):
+    logger.info("on_exit")
     icon.stop()
     stop_event.set()  # signal thread to stop immediately
     update_status(icon)
